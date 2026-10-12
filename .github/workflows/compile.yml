@@ -1,0 +1,60 @@
+name: Build PKG
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld unzip curl
+
+      - name: Descompactar o zip da raiz (qualquer nome)
+        run: |
+          ZIP="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
+          if [ -z "$ZIP" ]; then echo "Nenhum .zip na raiz do repo"; exit 1; fi
+          echo "Usando: $ZIP"
+          mkdir -p _proj
+          unzip -q "$ZIP" -d _proj
+          MK="$(find _proj -name Makefile -print -quit)"
+          if [ -z "$MK" ]; then echo "Makefile nao encontrado dentro do zip"; exit 1; fi
+          echo "PROJ=$(cd "$(dirname "$MK")" && pwd)" >> "$GITHUB_ENV"
+
+      - name: Baixar o toolchain do OpenOrbis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p _oo && cd _oo
+          if ! curl -fL -o oo.tar.gz https://github.com/StevenMiller123/OpenOrbis-PS4-Toolchain/releases/latest/download/openorbis_toolchain.tar.gz; then
+            echo "Fallback: release oficial do OpenOrbis"
+            gh release download --repo OpenOrbis/OpenOrbis-PS4-Toolchain --pattern '*.tar.gz' --output oo.tar.gz
+          fi
+          tar -xzf oo.tar.gz
+          LINK="$(find . -name link.x -print -quit)"
+          if [ -z "$LINK" ]; then echo "link.x nao encontrado: estrutura do toolchain mudou"; exit 1; fi
+          TC="$(cd "$(dirname "$LINK")" && pwd)"
+          echo "OO_PS4_TOOLCHAIN=$TC" >> "$GITHUB_ENV"
+          chmod +x "$TC"/bin/linux/* || true
+
+      - name: Baixar o SQLite (amalgamation)
+        working-directory: ${{ env.PROJ }}
+        run: |
+          chmod +x tools/get_sqlite.sh
+          ./tools/get_sqlite.sh
+
+      - name: Compilar o PKG
+        working-directory: ${{ env.PROJ }}
+        run: make
+
+      - name: Enviar o PKG como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoldHEN-Shortcut-Installer-pkg
+          path: ${{ env.PROJ }}/build/*.pkg
+          if-no-files-found: error
