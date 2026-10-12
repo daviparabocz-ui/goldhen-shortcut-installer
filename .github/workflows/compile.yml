@@ -55,6 +55,8 @@ jobs:
 
       - name: Compilar o PKG
         working-directory: ${{ env.PROJ }}
+        env:
+          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
         run: make
 
       - name: Enviar o PKG como artefato
