@@ -48,6 +48,20 @@ jobs:
           chmod +x tools/get_sqlite.sh
           ./tools/get_sqlite.sh
 
+      - name: Copiar libc.prx e libSceFios2.prx do toolchain
+        working-directory: ${{ env.PROJ }}
+        run: |
+          mkdir -p sce_module
+          ROOT="$(dirname "$OO_PS4_TOOLCHAIN")"
+          echo "PRX encontrados no toolchain:"
+          find "$ROOT" -name "*.prx" || true
+          for f in libc.prx libSceFios2.prx; do
+            SRC="$(find "$ROOT" -name "$f" -print -quit)"
+            [ -n "$SRC" ] || { echo "$f nao encontrado no toolchain"; exit 1; }
+            echo "$f <- $SRC"
+            cp "$SRC" sce_module/
+          done
+
       - name: Instalar libssl1.1 (o PkgTool.Core precisa; o Ubuntu novo so tem libssl3)
         run: |
           curl -fL -o libssl1.1.deb http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
